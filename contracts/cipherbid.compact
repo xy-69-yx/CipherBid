@@ -1,0 +1,347 @@
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+export enum AuctionStatus {
+  DRAFT,
+  OPEN,
+  CLOSED,
+  DELETED
+}
+
+export struct AuctionRecord {
+  organizer: Bytes<32>;
+  reservePrice: Uint<64>;
+  status: AuctionStatus;
+  highestBid: Uint<64>;
+  winnerBidId: Uint<64>;
+  winnerBidder: Bytes<32>;
+  bidCount: Uint<64>;
+  endAt: Uint<64>;
+}
+
+export struct BidRecord {
+  auctionId: Uint<64>;
+  bidder: Bytes<32>;
+  commitment: Bytes<32>;
+  amount: Uint<64>;
+  revealed: Boolean;
+}
+
+export struct BidRevealInput {
+  bidId: Uint<64>;
+  auctionId: Uint<64>;
+  amount: Uint<64>;
+  nonce: Bytes<32>;
+}
+
+export struct BidView {
+  bidId: Uint<64>;
+  auctionId: Uint<64>;
+  bidder: Bytes<32>;
+  amount: Uint<64>;
+  commitment: Bytes<32>;
+  revealed: Boolean;
+}
+
+export struct WinnerTally {
+  highestBid: Uint<64>;
+  winnerBidId: Uint<64>;
+  winnerBidder: Bytes<32>;
+}
+
+ledger nextAuctionId: Counter;
+ledger nextBidId: Counter;
+ledger auctions: Map<Uint<64>, AuctionRecord>;
+ledger bids: Map<Uint<64>, BidRecord>;
+
+witness localSk(): Bytes<32>;
+
+constructor() {
+  nextAuctionId.resetToDefault();
+  nextBidId.resetToDefault();
+  auctions.resetToDefault();
+  bids.resetToDefault();
+}
+
+circuit getDappPubKey(_sk: Bytes<32>): Bytes<32> {
+  return disclose(persistentHash<Vector<2, Bytes<32>>>([pad(32, "cipherbid:pk:"), _sk]));
+}
+
+circuit bidCommitment(auctionId: Uint<64>, amount: Uint<64>, nonce: Bytes<32>): Bytes<32> {
+  return disclose(persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "cipherbid:bid:"),
+    auctionId as Field as Bytes<32>,
+    amount as Field as Bytes<32>,
+    nonce
+  ]));
+}
+
+export circuit createAuction(reservePrice: Uint<64>, endAt: Uint<64>): Uint<64> {
+  const _sk = localSk();
+  const organizer = getDappPubKey(_sk);
+
+  nextAuctionId += 1;
+  const auctionId = nextAuctionId;
+
+  auctions.insert(
+    auctionId,
+    AuctionRecord{
+      organizer: organizer,
+      reservePrice: disclose(reservePrice),
+      status: AuctionStatus.OPEN,
+      highestBid: (0 as Uint<64>),
+      winnerBidId: (0 as Uint<64>),
+      winnerBidder: organizer,
+      bidCount: (0 as Uint<64>),
+      endAt: disclose(endAt),
+    },
+  );
+
+  return auctionId;
+}
+
+export circuit getAuction(auctionId: Uint<64>): AuctionRecord {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+  return auctions.lookup(disclosedAuctionId);
+}
+
+export circuit updateAuction(auctionId: Uint<64>, reservePrice: Uint<64>, endAt: Uint<64>): [] {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+
+  const _sk = localSk();
+  const organizer = getDappPubKey(_sk);
+  const auction = auctions.lookup(disclosedAuctionId);
+
+  assert(auction.organizer == organizer, "Only the organizer can update the auction");
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+
+  auctions.insert(
+    disclosedAuctionId,
+    AuctionRecord{
+      ...auction,
+      reservePrice: disclose(reservePrice),
+      endAt: disclose(endAt),
+    },
+  );
+}
+
+export circuit deleteAuction(auctionId: Uint<64>): [] {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+
+  const _sk = localSk();
+  const organizer = getDappPubKey(_sk);
+  const auction = auctions.lookup(disclosedAuctionId);
+
+  assert(auction.organizer == organizer, "Only the organizer can delete the auction");
+  assert(auction.bidCount == 0, "Delete bids first");
+
+  auctions.remove(disclosedAuctionId);
+}
+
+export circuit bid(auctionId: Uint<64>, amount: Uint<64>, nonce: Bytes<32>): Uint<64> {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+
+  const auction = auctions.lookup(disclosedAuctionId);
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+  assert(auction.bidCount < 8, "Auction already has the maximum of 8 bids");
+
+  const _sk = localSk();
+  const bidder = getDappPubKey(_sk);
+  const commitment = bidCommitment(disclosedAuctionId, amount, nonce);
+
+  nextBidId += 1;
+  const bidId = nextBidId;
+
+  bids.insert(
+    bidId,
+    BidRecord{
+      auctionId: disclosedAuctionId,
+      bidder: bidder,
+      commitment: commitment,
+      amount: (0 as Uint<64>),
+      revealed: false,
+    },
+  );
+
+  auctions.insert(
+    disclosedAuctionId,
+    AuctionRecord{
+      ...auction,
+      bidCount: (auction.bidCount + (1 as Uint<64>)) as Uint<64>,
+    },
+  );
+
+  return bidId;
+}
+
+export circuit getBid(bidId: Uint<64>): BidRecord {
+  const disclosedBidId = disclose(bidId);
+  assert(bids.member(disclosedBidId), "Bid not found");
+  return bids.lookup(disclosedBidId);
+}
+
+export circuit updateBid(bidId: Uint<64>, amount: Uint<64>, nonce: Bytes<32>): [] {
+  const disclosedBidId = disclose(bidId);
+  assert(bids.member(disclosedBidId), "Bid not found");
+
+  const bid = bids.lookup(disclosedBidId);
+  const auction = auctions.lookup(bid.auctionId);
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+
+  const _sk = localSk();
+  const bidder = getDappPubKey(_sk);
+
+  assert(bid.bidder == bidder, "Only the bidder can update the bid");
+
+  bids.insert(
+    disclosedBidId,
+    BidRecord{
+      ...bid,
+      commitment: bidCommitment(bid.auctionId, amount, nonce),
+      amount: 0,
+      revealed: false,
+    },
+  );
+}
+
+export circuit deleteBid(bidId: Uint<64>): [] {
+  const disclosedBidId = disclose(bidId);
+  assert(bids.member(disclosedBidId), "Bid not found");
+
+  const bid = bids.lookup(disclosedBidId);
+  const auction = auctions.lookup(bid.auctionId);
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+
+  const _sk = localSk();
+  const bidder = getDappPubKey(_sk);
+
+  assert(bid.bidder == bidder, "Only the bidder can delete the bid");
+
+  bids.remove(disclosedBidId);
+
+  auctions.insert(
+    bid.auctionId,
+    AuctionRecord{
+      ...auction,
+      bidCount: (auction.bidCount - (1 as Uint<64>)) as Uint<64>,
+    },
+  );
+}
+
+circuit verifyAndRevealBid(reveal: BidRevealInput): BidView {
+  const bidId = disclose(reveal.bidId);
+  const auctionId = disclose(reveal.auctionId);
+  const amount = disclose(reveal.amount);
+
+  if (bidId == 0) {
+    return default<BidView>;
+  }
+
+  assert(bids.member(bidId), "Bid not found");
+
+  const bid = bids.lookup(bidId);
+  assert(bid.auctionId == auctionId, "Reveal does not match the bid");
+
+  const auction = auctions.lookup(auctionId);
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not ready for reveal");
+
+  const expectedCommitment = bidCommitment(auctionId, amount, reveal.nonce);
+  assert(bid.commitment == expectedCommitment, "Reveal does not match commitment");
+
+  bids.insert(
+    bidId,
+    BidRecord{
+      ...bid,
+      amount: amount,
+      revealed: true,
+    },
+  );
+
+  return BidView{
+    bidId: bidId,
+    auctionId: auctionId,
+    bidder: bid.bidder,
+    amount: amount,
+    commitment: bid.commitment,
+    revealed: true,
+  };
+}
+
+circuit pickWinner(current: WinnerTally, bid: BidView): WinnerTally {
+  if (bid.bidId == 0) {
+    return current;
+  }
+
+  if (bid.amount > current.highestBid) {
+    return WinnerTally{
+      highestBid: bid.amount,
+      winnerBidId: bid.bidId,
+      winnerBidder: bid.bidder,
+    };
+  }
+
+  return current;
+}
+
+export circuit seeAllBids(auctionId: Uint<64>, reveals: Vector<8, BidRevealInput>): Vector<8, BidView> {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+
+  const _sk = localSk();
+  const organizer = getDappPubKey(_sk);
+  const auction = auctions.lookup(disclosedAuctionId);
+
+  assert(auction.organizer == organizer, "Only the organizer can inspect bids");
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+
+  return map(verifyAndRevealBid, reveals);
+}
+
+circuit countRevealed(current: Uint<64>, bid: BidView): Uint<64> {
+  return bid.bidId == 0 ? current : (current + (1 as Uint<64>)) as Uint<64>;
+}
+
+export circuit finalizeAuction(auctionId: Uint<64>, reveals: Vector<8, BidRevealInput>): [] {
+  const disclosedAuctionId = disclose(auctionId);
+  assert(auctions.member(disclosedAuctionId), "Auction not found");
+
+  const _sk = localSk();
+  const organizer = getDappPubKey(_sk);
+  const auction = auctions.lookup(disclosedAuctionId);
+
+  assert(auction.organizer == organizer, "Only the organizer can finalize the auction");
+  assert(auction.status == AuctionStatus.OPEN, "Auction is not open");
+  assert(auction.bidCount > 0, "Auction has no bids");
+
+  const disclosedBids = seeAllBids(disclosedAuctionId, reveals);
+  const revealedCount = fold(countRevealed, 0, disclosedBids);
+
+  assert(revealedCount == auction.bidCount, "Reveal every bid before finalizing");
+  const tally = fold(
+    pickWinner,
+    WinnerTally{
+      highestBid: 0,
+      winnerBidId: 0,
+      winnerBidder: organizer,
+    },
+    disclosedBids,
+  );
+
+  assert(tally.highestBid >= auction.reservePrice, "Reserve price was not met");
+
+  auctions.insert(
+    disclosedAuctionId,
+    AuctionRecord{
+      ...auction,
+      status: AuctionStatus.CLOSED,
+      highestBid: tally.highestBid,
+      winnerBidId: tally.winnerBidId,
+      winnerBidder: tally.winnerBidder,
+    },
+  );
+}
