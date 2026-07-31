@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CipherBid
 
-## Getting Started
+CipherBid is a sealed-bid auction contract for Midnight: bids remain committed
+until reveal, while the winning bid can be verified.
 
-First, run the development server:
+Each auction accepts up to eight bids. `seeAllBids` and `finalizeAuction` use a
+fixed eight-slot reveal batch; use `bidId = 0` for unused slots.
+
+## Browser deployment on Preview
+
+CipherBid follows the browser deployment pattern from
+[`tusharpamnani/midnight-skills-counter-dapp`](https://github.com/tusharpamnani/midnight-skills-counter-dapp).
+The 1AM browser extension supplies the wallet, balancing, proving, and
+transaction submission providers. There is no funded server wallet and no
+local proof server in the deployment flow.
+
+Prerequisites:
+
+- Node.js 22 or newer
+- The [1AM browser extension](https://1am.xyz), configured for Midnight Preview
+- The Compact compiler only when regenerating the contract bundle
+
+Run the app:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) for the full CipherBid dashboard, or
+[http://localhost:3000/deploy](http://localhost:3000/deploy) for the focused deploy flow. Then:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Connect 1AM. CipherBid requests the `preview` network explicitly.
+2. Click **Deploy CipherBid** and approve the extension flow.
+3. Keep the page open while 1AM proves and submits the transaction.
+4. Copy the contract address and transaction link shown in the success panel.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The full dashboard also includes live contract snapshot loading and the on-chain
+auction actions for create, bid, reveal, finalize, update, and delete.
 
-## Learn More
+## Contract generation
 
-To learn more about Next.js, take a look at the following resources:
+The Compact source is [`contracts/cipherbid.compact`](contracts/cipherbid.compact).
+To regenerate its TypeScript bundle and browser proving assets:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run compile
+npm run sync:assets
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The generated `contract-info.json` is the source of truth for the Compact
+runtime version. This project pins `@midnight-ntwrk/compact-runtime` to the
+bundle's runtime version rather than forcing an incompatible generated bundle.
 
-## Deploy on Vercel
+## Build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The deploy route is client-side. It creates the unproven deploy transaction in
+the browser, obtains the proving provider from 1AM, balances through 1AM, and
+submits through 1AM.
