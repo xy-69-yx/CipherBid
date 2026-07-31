@@ -1,5 +1,7 @@
 # CipherBid
 
+[![CI](https://github.com/xy-69-yx/CipherBid/actions/workflows/ci.yml/badge.svg)](https://github.com/xy-69-yx/CipherBid/actions/workflows/ci.yml)
+
 CipherBid is a privacy-preserving sealed-bid auction application built on
 Midnight. Auction creators publish an auction, bidders submit commitments
 without exposing their bid amounts, and the contract verifies the reveal before
@@ -14,6 +16,7 @@ auction or place a private bid.
 | Resource | Link |
 | --- | --- |
 | Live application | [cipher-bid-nine.vercel.app](https://cipher-bid-nine.vercel.app) |
+| Demo video | [Watch the CipherBid walkthrough](docs/demo/cipherbid-demo.mp4) |
 | Deployed contract | [View on 1AM Explorer](https://explorer.1am.xyz/contract/92ba0c6e876224955ab29bd3cb527bb4b4c99a6e03df189236118c2e79367b48?network=preview) |
 | Source repository | [github.com/xy-69-yx/CipherBid](https://github.com/xy-69-yx/CipherBid) |
 | Compact contract | [`contracts/cipherbid.compact`](contracts/cipherbid.compact) |
@@ -27,13 +30,9 @@ auction or place a private bid.
       <strong>CipherBid walkthrough</strong>
       <br />
       <br />
-      The demo recording has not been added to the repository yet.
+      <a href="docs/demo/cipherbid-demo.mp4"><strong>Watch the demo video</strong></a>
       <br />
-      Add the final recording at <code>docs/demo/cipherbid-demo.mp4</code> or
-      replace this message with the hosted video link.
-      <br />
-      <br />
-      <a href="https://cipher-bid-nine.vercel.app">Open the live application</a>
+      <sub>Contract connection, auction creation, and private bidding walkthrough</sub>
     </td>
   </tr>
 </table>
