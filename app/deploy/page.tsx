@@ -1,10 +1,5 @@
-import CipherBidFrontend from "../CipherBidFrontend";
-
-export const metadata = {
-  title: "Deploy CipherBid | Midnight Preview",
-  description: "Deploy CipherBid through the 1AM wallet on Midnight Preview.",
-};
+import { redirect } from "next/navigation";
 
 export default function DeployPage() {
-  return <CipherBidFrontend mode="deploy" />;
+  redirect("/");
 }

@@ -1,7 +1,11 @@
 "use client";
 
 import { ContractState } from "@midnight-ntwrk/compact-runtime";
-import { LedgerParameters, ZswapChainState } from "@midnight-ntwrk/ledger-v8";
+import {
+  LedgerParameters,
+  ZswapChainState,
+  type FinalizedTransaction,
+} from "@midnight-ntwrk/ledger-v8";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
@@ -43,9 +47,7 @@ type WalletApi = {
   }>;
   getProvingProvider(provider: unknown): Promise<unknown>;
   balanceUnsealedTransaction(tx: string): Promise<{ tx?: string }>;
-  submitTransaction(
-    tx: string,
-  ): Promise<string | { transactionId?: string; id?: string } | null | undefined>;
+  submitTransaction(tx: string): Promise<void>;
 };
 
 type OneAmWallet = {
@@ -242,13 +244,14 @@ export async function connectPreviewWallet(zkAssetBasePath: string): Promise<Con
   };
 
   const midnightProvider: MidnightProvider = {
-    submitTx: async (transaction: { serialize(): Uint8Array }) => {
+    submitTx: async (transaction: FinalizedTransaction) => {
       const serialized = toHex(transaction.serialize());
-      const result = await api.submitTransaction(serialized);
-      if (typeof result === "string") {
-        return result || serialized.slice(0, 64);
+      await api.submitTransaction(serialized);
+      const txId = transaction.identifiers()[0];
+      if (!txId) {
+        throw new Error("The submitted transaction did not contain a transaction ID.");
       }
-      return result?.transactionId ?? result?.id ?? serialized.slice(0, 64);
+      return txId;
     },
   };
 
