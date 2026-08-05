@@ -57,6 +57,9 @@ jobs:
       - name: Compile contract
         run: npm run compile
 
+      - name: Run contract tests
+        run: npm test
+
       - name: Upload compiled contract bundle
         uses: actions/upload-artifact@v4
         with:

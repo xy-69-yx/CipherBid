@@ -2,11 +2,13 @@
   "name": "cipherbid",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --test tests/*.test.mjs",
     "compile": "compact compile contracts/cipherbid.compact contract/src/managed/cipherbid",
     "sync:assets": "mkdir -p public/zk/cipherbid && cp -Rf contract/src/managed/cipherbid/keys public/zk/cipherbid/ && cp -Rf contract/src/managed/cipherbid/zkir public/zk/cipherbid/"
   },

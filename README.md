@@ -20,6 +20,7 @@ auction or place a private bid.
 | Deployed contract | [View on 1AM Explorer](https://explorer.1am.xyz/contract/92ba0c6e876224955ab29bd3cb527bb4b4c99a6e03df189236118c2e79367b48?network=preview) |
 | Source repository | [github.com/xy-69-yx/CipherBid](https://github.com/xy-69-yx/CipherBid) |
 | Compact contract | [`contracts/cipherbid.compact`](contracts/cipherbid.compact) |
+| Product proposal | [`PROPOSAL.md`](PROPOSAL.md) |
 | 1AM wallet | [1am.xyz](https://1am.xyz) |
 
 ## Demo Video
@@ -259,16 +260,25 @@ The generated browser proving assets are copied into `public/zk/cipherbid`.
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
+
+## Tests
+
+`npm test` runs three Compact contract tests against the generated contract:
+
+1. commitment verification rejects a changed amount or nonce;
+2. auction ledger state moves from open bidding to the correct finalized winner;
+3. public bid state excludes the unrevealed amount, nonce, and raw local secret.
 
 ## CI
 
 The GitHub Actions workflow contains two jobs:
 
-1. **Compile contract** installs the pinned Compact CLI and compiler, installs
-   dependencies without a package lock, compiles the contract, and uploads the
-   generated bundle.
+1. **Compile and test contract** installs the pinned Compact CLI and compiler,
+   installs dependencies, compiles the contract, runs all contract tests, and
+   uploads the generated bundle.
 2. **Build frontend** downloads that bundle, synchronizes the proving assets,
    and creates the Next.js production build.
 
@@ -282,6 +292,8 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 ├── contract/src/               # Generated contract client and witnesses
 ├── contracts/                  # Compact source contract
 ├── docs/screenshots/           # README screenshots
+├── tests/                      # Compact circuit and privacy tests
+├── PROPOSAL.md                 # Product, privacy, and Mainnet scope
 ├── lib/cipherbid.ts             # Shared contract configuration and client
 ├── lib/midnight.ts              # 1AM and Midnight provider integration
 ├── public/zk/cipherbid/         # Browser proving and verifier assets
